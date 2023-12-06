@@ -1,7 +1,7 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
-const { Client } = require("pg");
+const mysql = require("mysql2");
 
 /*
     This is just for reading environment files like `.env` file
@@ -13,19 +13,18 @@ dotenv.config();
     This creates a new PostgreSQL client instance. 
     This instance can be used to query our database 
 */
-const pgClient = new Client({
-  // connectionString: process.env.DB_CONNECTION_STRING,
-  database: "da_task_1",
-  password: 'password@123',
-  port: 1433,
-  host: 'postgresf8002.postgres.database.azure.com',
-  user: 'postgres'
+const connection = mysql.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
 });
 
-pgClient.connect().then(() => {
+connection.connect((err) => {
+  if (err) {
+    console.log("DB Connection Issue: ", err)
+  }
   console.log("DB Connected");
-}).catch(err => {
-  console.log("DB Connection Issue: ", err)
 });
 
 /*
@@ -44,11 +43,11 @@ app.use(cors());
     When a GET request is made to '/' route, this will read the users data from database and send it to frontend 
 */
 app.get("/", (req, res) => {
-  pgClient.query("SELECT * FROM users", [], (error, results) => {
+  connection.query("SELECT * FROM users", (error, results) => {
     if (error) {
       throw error;
     }
-    res.status(208).json(results.rows);
+    res.status(208).json(results);
   });
 });
 
@@ -59,14 +58,15 @@ app.get("/", (req, res) => {
 app.post("/", (req, res) => {
   const newData = req.body;
 
-  pgClient.query(
-    "INSERT INTO users (name, phone_number) VALUES ($1, $2) RETURNING *",
+  const sql = `INSERT INTO users (name, phone_number) VALUES ('${newData.name}', '${newData.phone_number}')`;
+  connection.execute(
+    "INSERT INTO users (name, phone_number) VALUES (?, ?)",
     [newData.name, newData.phone_number],
     (error, results) => {
       if (error) {
         throw error;
       }
-      res.status(201).send(`User added with ID: ${results.rows[0].id}`);
+      res.status(201).send(`User added`);
     }
   );
 });
